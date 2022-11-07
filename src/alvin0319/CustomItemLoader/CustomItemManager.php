@@ -121,7 +121,7 @@ final class CustomItemManager{
 	private function refresh() : void{
 		$this->netToCoreMap->setValue(ItemTranslator::getInstance(), $this->netToCoreValues);
 		$this->coreToNetMap->setValue(ItemTranslator::getInstance(), $this->coreToNetValues);
-		$this->itemTypeMap->setValue(ItemTypeDictionary::getInstance()->getEntries(), $this->itemTypeEntries);
+		$this->itemTypeMap->setValue(ItemTypeDictionary::getInstance(), $this->itemTypeEntries);
 		$this->packet = ItemComponentPacket::create($this->packetEntries);
 	}
 
