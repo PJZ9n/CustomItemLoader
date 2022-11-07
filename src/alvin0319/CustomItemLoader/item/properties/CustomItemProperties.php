@@ -23,9 +23,13 @@ use pocketmine\block\BlockToolType;
 use pocketmine\inventory\ArmorInventory;
 use pocketmine\item\Item;
 use pocketmine\item\ItemFactory;
+use pocketmine\nbt\tag\ByteTag;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\FloatTag;
+use pocketmine\nbt\tag\IntTag;
 use pocketmine\nbt\tag\ListTag;
+use pocketmine\nbt\tag\ShortTag;
+use pocketmine\nbt\tag\StringTag;
 use pocketmine\utils\AssumptionFailedError;
 use ReflectionClass;
 use function in_array;
@@ -81,7 +85,7 @@ final class CustomItemProperties{
 	/** @var bool */
 	protected bool $tool = false;
 	/** @var int */
-	protected int $toolType = BlockToolType::NONE;
+	protected int $toolType = BlockToolType::TYPE_NONE;
 	/** @var int */
 	protected int $toolTier = 0;
 
@@ -154,7 +158,7 @@ final class CustomItemProperties{
 		}
 
 		if(isset($data["residue"])){
-			$this->setResidue(ItemFactory::getInstance()->get((int) $data["residue"]["id"], (int) ($data["residue"]["meta"] ?? 0)));
+			$this->setResidue(ItemFactory::get((int) $data["residue"]["id"], (int) ($data["residue"]["meta"] ?? 0)));
 		}
 
 		if(isset($data["armor"]) && $data["armor"]){
@@ -326,13 +330,13 @@ final class CustomItemProperties{
 		$this->durable = $durable;
 		if($this->durable){
 			$this->max_durability = $maxDurability;
-			$this->nbt->getCompoundTag("components")?->setTag("minecraft:durability", CompoundTag::create()
-				->setTag("damage_chance", CompoundTag::create()
-					->setInt("min", 100) // maybe make this a config value
-					->setInt("max", 100) // maybe make this a config value
-				)
-				->setInt("max_durability", $maxDurability)
-			);
+			$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:durability", [
+				new CompoundTag("damage_chance", [
+					new IntTag("min", 100), // maybe make this a config value
+					new IntTag("max", 100), // maybe make this a config value
+				]),
+				new IntTag("max_durability", $maxDurability),
+			]));
 		}
 	}
 
@@ -449,14 +453,14 @@ final class CustomItemProperties{
 		if(!in_array($armorClass, $acceptedArmorValues, true)){
 			throw new InvalidArgumentException("Armor class is invalid");
 		}
-		$this->nbt->getCompoundTag("components")?->setTag("minecraft:armor", CompoundTag::create()
-			->setString("texture_type", $armorClass)
-			->setInt("protection", 0)
-		);
-		$this->nbt->getCompoundTag("components")?->setTag("minecraft:wearable", CompoundTag::create()
-			->setString("slot", $armorSlotToStringMap[$armor_slot_int] ?? throw new AssumptionFailedError("Unknown armor slot type"))
-			->setByte("dispensable", 1)
-		);
+		$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:armor", [
+			new StringTag("texture_type", $armorClass),
+			new IntTag("protection", 0),
+		]));
+		$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:wearable", [
+			new StringTag("slot", $armorSlotToStringMap[$armor_slot_int] ?? throw new AssumptionFailedError("Unknown armor slot type")),
+			new ByteTag("dispensable", ),
+		]));
 		/*
 		// TODO: find out what does this do
 		$this->nbt->getCompoundTag("components")?->getCompoundTag("item_properties")
@@ -496,10 +500,10 @@ final class CustomItemProperties{
 	public function setCooldown(int $cooldown) : void{
 		$this->cooldown = $cooldown;
 		if($this->cooldown > 0){
-			$this->nbt->getCompoundTag("components")?->setTag("minecraft:cooldown", CompoundTag::create()
-				->setString("category", "attack")
-				->setFloat("duration", $this->cooldown / 20)
-			);
+			$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:cooldown", [
+				new StringTag("category", "attack"),
+				new FloatTag("duration", $this->cooldown / 20),
+			]));
 		}
 	}
 
@@ -533,11 +537,11 @@ final class CustomItemProperties{
 			if($this->durable){
 				throw new AssumptionFailedError("Food cannot be durable");
 			}
-			$this->nbt->getCompoundTag("components")?->setTag("minecraft:food", CompoundTag::create()
-				->setByte("can_always_eat", $canAlwaysEat ? 1 : 0)
-				->setInt("nutrition", $nutrition)
-				->setFloat("saturation_modifier", 0.6)
-			);
+			$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:food", [
+				new ByteTag("can_always_eat", $canAlwaysEat ? 1 : 0),
+				new IntTag("nutrition", $nutrition),
+				new FloatTag("saturation_modifier", 0.6),
+			]));
 			$this->saturation = $saturation;
 			$this->nutrition = $nutrition;
 		}
@@ -671,40 +675,40 @@ final class CustomItemProperties{
 	public function setRenderOffsets(int $pngSize) : void{
 		[$x, $y, $z] = $this->calculateOffset($pngSize);
 		// TODO: Find out rotation and position formula
-		$this->nbt->getCompoundTag("components")?->setTag("minecraft:render_offsets", CompoundTag::create()
-			->setTag("main_hand", CompoundTag::create()
-				->setTag("first_person", CompoundTag::create()
-					->setTag("scale", new ListTag([
-						new FloatTag($x),
-						new FloatTag($y),
-						new FloatTag($z)
-					]))
-				)
-				->setTag("third_person", CompoundTag::create()
-					->setTag("scale", new ListTag([
-						new FloatTag($x),
-						new FloatTag($y),
-						new FloatTag($z)
-					]))
-				)
-			)
-			->setTag("off_hand", CompoundTag::create()
-				->setTag("first_person", CompoundTag::create()
-					->setTag("scale", new ListTag([
-						new FloatTag($x),
-						new FloatTag($y),
-						new FloatTag($z)
-					]))
-				)
-				->setTag("third_person", CompoundTag::create()
-					->setTag("scale", new ListTag([
-						new FloatTag($x),
-						new FloatTag($y),
-						new FloatTag($z)
-					]))
-				)
-			)
-		);
+		$this->nbt->getCompoundTag("components")?->setTag(new CompoundTag("minecraft:render_offsets", [
+			new CompoundTag("main_hand", [
+				new CompoundTag("first_person", [
+					new ListTag("scale", [
+						new FloatTag("", $x),
+						new FloatTag("", $y),
+						new FloatTag("", $z),
+					]),
+				]),
+				new CompoundTag("third_person", [
+					new ListTag("scale", [
+						new FloatTag("", $x),
+						new FloatTag("", $y),
+						new FloatTag("", $z),
+					]),
+				]),
+			]),
+			new CompoundTag("off_hand", [
+				new CompoundTag("first_person", [
+					new ListTag("scale", [
+						new FloatTag("", $x),
+						new FloatTag("", $y),
+						new FloatTag("", $z),
+					]),
+				]),
+				new CompoundTag("third_person", [
+					new ListTag("scale", [
+						new FloatTag("", $x),
+						new FloatTag("", $y),
+						new FloatTag("", $z),
+					]),
+				]),
+			]),
+		]));
 	}
 
 	private function setMaxStackSize(int $max_stack_size) : void{
@@ -733,19 +737,20 @@ final class CustomItemProperties{
 	}
 
 	private function buildBaseComponent(string $texture, string $namespace, int $runtimeId, string $name) : void{
-		$this->nbt = CompoundTag::create()
-			->setTag("components", CompoundTag::create()
-				->setTag("minecraft:display_name", CompoundTag::create()
-					->setString("value", $name)
-				)
-				->setTag("item_properties", CompoundTag::create()
-					->setInt("use_duration", 32)
-					->setTag("minecraft:icon", CompoundTag::create()
-						->setString("texture", $texture)
-						->setString("legacy_id", $namespace)
-					)
-				)
-			)
-			->setShort("minecraft:identifier", $runtimeId);
+		$this->nbt = new CompoundTag("", [
+			new CompoundTag("components", [
+				new CompoundTag("minecraft:display_name", [
+					new StringTag("value", $name),
+				]),
+				new CompoundTag("item_properties", [
+					new IntTag("use_duration", 32),
+					new CompoundTag("minecraft:icon", [
+						new StringTag("texture", $texture),
+						new StringTag("legacy_id", $namespace),
+					]),
+				]),
+			]),
+			new ShortTag("minecraft:identifier", $runtimeId),
+		]);
 	}
 }

@@ -19,7 +19,8 @@ declare(strict_types=1);
 namespace alvin0319\CustomItemLoader\item;
 
 use alvin0319\CustomItemLoader\item\properties\CustomItemProperties;
-use pocketmine\item\ItemIdentifier;
+use pocketmine\block\BlockFactory;
+use pocketmine\item\ItemIds;
 
 trait CustomItemTrait{
 	/** @var CustomItemProperties */
@@ -27,7 +28,7 @@ trait CustomItemTrait{
 
 	public function __construct(string $name, CustomItemProperties $properties){
 		$this->properties = $properties;
-		parent::__construct(new ItemIdentifier($this->properties->getId(), $this->properties->getMeta()), $this->properties->getName());
+		parent::__construct($this->properties->getId(), $this->properties->getMeta(), $this->properties->getName());
 	}
 
 	public function getProperties() : CustomItemProperties{
@@ -54,7 +55,7 @@ trait CustomItemTrait{
 		if($isCorrectTool){
 			return $this->properties->getMiningSpeed();
 		}
-		return parent::getMiningEfficiency(false);
+		return parent::getMiningEfficiency(BlockFactory::get(ItemIds::AIR));//TODO: 適正なツールを入れる
 	}
 
 	public function getMaxStackSize() : int{

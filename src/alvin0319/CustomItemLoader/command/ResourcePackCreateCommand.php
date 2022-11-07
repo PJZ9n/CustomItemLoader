@@ -21,16 +21,15 @@ namespace alvin0319\CustomItemLoader\command;
 use alvin0319\CustomItemLoader\CustomItemLoader;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
+use pocketmine\command\PluginIdentifiableCommand;
 use pocketmine\command\utils\InvalidCommandSyntaxException;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
-use pocketmine\plugin\PluginOwned;
-use pocketmine\plugin\PluginOwnedTrait;
-use Ramsey\Uuid\Uuid;
+use pocketmine\plugin\Plugin;
+use pocketmine\utils\UUID;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use SplFileInfo;
-use Webmozart\PathUtil\Path;
 use ZipArchive;
 use function array_shift;
 use function explode;
@@ -43,8 +42,8 @@ use function json_encode;
 use function mkdir;
 use function trim;
 
-class ResourcePackCreateCommand extends Command implements PluginOwned{
-	use PluginOwnedTrait;
+class ResourcePackCreateCommand extends Command implements PluginIdentifiableCommand {
+	private Plugin $owningPlugin;
 
 	public function __construct(){
 		parent::__construct("rsc");
@@ -72,7 +71,7 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 				if(trim($pack_description ?? "") === ""){
 					$pack_description = "Resource pack for custom item";
 				}
-				if(is_dir($pathDir = Path::join(CustomItemLoader::getInstance()->getResourcePackFolder(), $pack_name))){
+				if(is_dir($pathDir = CustomItemLoader::getInstance()->getResourcePackFolder() .  $pack_name)){
 					$sender->sendMessage("\"$pack_name\" is already in use");
 					return false;
 				}
@@ -87,7 +86,7 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 					"header" => [
 						"description" => $pack_description,
 						"name" => $pack_name,
-						"uuid" => Uuid::uuid4()->toString(),
+						"uuid" => UUID::fromRandom()->toString(),
 						"version" => [0, 0, 1],
 						"min_engine_version" => [(int) $protocolInfo[0], (int) $protocolInfo[1], (int) $protocolInfo[2]]
 					],
@@ -95,28 +94,28 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 						[
 							"description" => $pack_description,
 							"type" => "resources",
-							"uuid" => Uuid::uuid4()->toString(),
+							"uuid" => UUID::fromRandom()->toString(),
 							"version" => [0, 0, 1]
 						]
 					]
 				];
-				file_put_contents(Path::join($pathDir, "manifest.json"), json_encode($manifests, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_BIGINT_AS_STRING));
-				if(!mkdir($concurrentDirectory = Path::join($pathDir, 'textures')) && !is_dir($concurrentDirectory)){
+				file_put_contents($pathDir . "manifest.json", json_encode($manifests, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_BIGINT_AS_STRING));
+				if(!mkdir($concurrentDirectory = $pathDir . 'textures') && !is_dir($concurrentDirectory)){
 					throw new RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
 				}
-				if(!mkdir($concurrentDirectory = Path::join($concurrentDirectory, 'items')) && !is_dir($concurrentDirectory)){
+				if(!mkdir($concurrentDirectory = $concurrentDirectory . 'items') && !is_dir($concurrentDirectory)){
 					throw new RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
 				}
-				if(!mkdir($concurrentDirectory = Path::join($pathDir, 'texts')) && !is_dir($concurrentDirectory)){
+				if(!mkdir($concurrentDirectory = $pathDir . 'texts') && !is_dir($concurrentDirectory)){
 					throw new RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
 				}
 
-				file_put_contents(Path::join($pathDir, 'textures', 'item_texture.json'), json_encode([
+				file_put_contents($pathDir . 'textures' . 'item_texture.json', json_encode([
 					"resource_pack_name" => "vanilla",
 					"texture_name" => "atlas.items",
 					"texture_data" => []
 				], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_BIGINT_AS_STRING));
-				file_put_contents(Path::join($concurrentDirectory, 'en_US.lang'), "");
+				file_put_contents($concurrentDirectory . 'en_US.lang', "");
 				$sender->sendMessage("Resource pack creation was successful!");
 				break;
 			case "additem":
@@ -128,16 +127,16 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 					$sender->sendMessage("Usage: /rsc additem [pack_name] [item_name] [namespace]");
 					return false;
 				}
-				if(!is_dir($pathDir = Path::join(CustomItemLoader::getInstance()->getResourcePackFolder(), $pack_name))){
+				if(!is_dir($pathDir = CustomItemLoader::getInstance()->getResourcePackFolder() . $pack_name)){
 					$sender->sendMessage("Resource pack \"$pack_name\" is not found");
 					return false;
 				}
-				$file = file_get_contents($path = Path::join($pathDir, 'texts', 'en_US.lang'));
+				$file = file_get_contents($path = $pathDir . 'texts' . 'en_US.lang');
 				$parsed = $this->parseLang($file);
 				$parsed["item." . $namespace] = $name;
 				file_put_contents($path, $this->combineLang($parsed));
 
-				$file = file_get_contents($path = Path::join($pathDir, 'textures', 'item_texture.json'));
+				$file = file_get_contents($path = $pathDir . 'textures' . 'item_texture.json');
 				$parsed = json_decode($file, true, 512, JSON_THROW_ON_ERROR);
 				$parsed["texture_data"][$name] = ["textures" => "textures/items/{$name}"];
 				file_put_contents($path, json_encode($parsed, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_BIGINT_AS_STRING));
@@ -150,7 +149,7 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 					$sender->sendMessage("Usage: /rsc makepack [name]");
 					return false;
 				}
-				if(!is_dir($pathDir = Path::join(CustomItemLoader::getInstance()->getResourcePackFolder(), $pack_name))){
+				if(!is_dir($pathDir = CustomItemLoader::getInstance()->getResourcePackFolder() . $pack_name)){
 					$sender->sendMessage("Resource pack \"$pack_name\" is not found");
 					return false;
 				}
@@ -160,7 +159,7 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 				/** @var SplFileInfo $resource */
 				foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($pathDir)) as $resource){
 					if($resource->isFile()){
-						$relativePath = Path::normalize(preg_replace("/.*[\/\\\\]{$pack_name}[\/\\\\].*/U", '', $resource->getPathname()));
+						$relativePath = preg_replace("/.*[\/\\\\]{$pack_name}[\/\\\\].*/U", '', $resource->getPathname());//TODO: normalize?
 						$zip->addFile($resource->getPathname(), $relativePath);
 					}
 				}
@@ -176,6 +175,11 @@ class ResourcePackCreateCommand extends Command implements PluginOwned{
 				throw new InvalidCommandSyntaxException();
 		}
 		return true;
+	}
+
+	public function getPlugin(): Plugin
+	{
+		return $this->owningPlugin;
 	}
 
 	private function parseLang(string $str) : array{

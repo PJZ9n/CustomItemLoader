@@ -22,14 +22,14 @@ use alvin0319\CustomItemLoader\CustomItemLoader;
 use alvin0319\CustomItemLoader\CustomItemManager;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
+use pocketmine\command\PluginIdentifiableCommand;
 use pocketmine\command\utils\InvalidCommandSyntaxException;
-use pocketmine\plugin\PluginOwned;
-use pocketmine\plugin\PluginOwnedTrait;
+use pocketmine\plugin\Plugin;
 use function array_shift;
 use function count;
 
-final class CustomItemLoaderCommand extends Command implements PluginOwned{
-	use PluginOwnedTrait;
+final class CustomItemLoaderCommand extends Command implements PluginIdentifiableCommand {
+	private Plugin $owningPlugin;
 
 	public function __construct(){
 		parent::__construct("customitemloader");
@@ -54,5 +54,10 @@ final class CustomItemLoaderCommand extends Command implements PluginOwned{
 				throw new InvalidCommandSyntaxException();
 		}
 		return true;
+	}
+
+	public function getPlugin(): Plugin
+	{
+		return $this->owningPlugin;
 	}
 }

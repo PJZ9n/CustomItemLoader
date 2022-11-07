@@ -27,12 +27,9 @@ use alvin0319\CustomItemLoader\item\CustomToolItem;
 use alvin0319\CustomItemLoader\item\properties\CustomItemProperties;
 use pocketmine\item\Item;
 use pocketmine\item\ItemFactory;
-use pocketmine\item\StringToItemParser;
-use pocketmine\network\mcpe\convert\GlobalItemTypeDictionary;
 use pocketmine\network\mcpe\convert\ItemTranslator;
+use pocketmine\network\mcpe\convert\ItemTypeDictionary;
 use pocketmine\network\mcpe\protocol\ItemComponentPacket;
-use pocketmine\network\mcpe\protocol\serializer\ItemTypeDictionary;
-use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\types\ItemComponentPacketEntry;
 use pocketmine\network\mcpe\protocol\types\ItemTypeEntry;
 use pocketmine\utils\SingletonTrait;
@@ -77,7 +74,7 @@ final class CustomItemManager{
 		$this->itemTypeMap = $ref_1->getProperty("itemTypes");
 		$this->itemTypeMap->setAccessible(true);
 
-		$this->itemTypeEntries = $this->itemTypeMap->getValue(GlobalItemTypeDictionary::getInstance()->getDictionary());
+		$this->itemTypeEntries = ItemTypeDictionary::getInstance()->getEntries();
 
 		$this->packetEntries = [];
 
@@ -110,17 +107,11 @@ final class CustomItemManager{
 
 			$this->itemTypeEntries[] = new ItemTypeEntry($item->getProperties()->getNamespace(), $runtimeId, true);
 
-			$this->packetEntries[] = new ItemComponentPacketEntry($item->getProperties()->getNamespace(), new CacheableNbt($item->getProperties()->getNbt()));
+			$this->packetEntries[] = new ItemComponentPacketEntry($item->getProperties()->getNamespace(), $item->getProperties()->getNbt());
 
 			$this->registered[] = $item;
 
-			$new = clone $item;
-
-			if(StringToItemParser::getInstance()->parse($item->getProperties()->getName()) === null){
-				StringToItemParser::getInstance()->register($item->getProperties()->getName(), fn() => $new);
-			}
-
-			ItemFactory::getInstance()->register($item, true);
+			ItemFactory::registerItem($item, true);
 		}catch(Throwable $e){
 			throw new \InvalidArgumentException("Failed to register item: " . $e->getMessage(), $e->getLine(), $e);
 		}
@@ -130,7 +121,7 @@ final class CustomItemManager{
 	private function refresh() : void{
 		$this->netToCoreMap->setValue(ItemTranslator::getInstance(), $this->netToCoreValues);
 		$this->coreToNetMap->setValue(ItemTranslator::getInstance(), $this->coreToNetValues);
-		$this->itemTypeMap->setValue(GlobalItemTypeDictionary::getInstance()->getDictionary(), $this->itemTypeEntries);
+		$this->itemTypeMap->setValue(ItemTypeDictionary::getInstance()->getEntries(), $this->itemTypeEntries);
 		$this->packet = ItemComponentPacket::create($this->packetEntries);
 	}
 
@@ -141,7 +132,7 @@ final class CustomItemManager{
 	public function registerDefaultItems(array $data, bool $reload = false) : void{
 		if($reload){
 			ItemTranslator::reset();
-			GlobalItemTypeDictionary::reset();
+			ItemTypeDictionary::reset();
 		}
 		foreach($data as $name => $itemData){
 			$this->registerItem(self::getItem($name, $itemData));

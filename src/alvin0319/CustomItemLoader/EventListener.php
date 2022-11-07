@@ -24,21 +24,14 @@ use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\item\Item;
-use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\BiomeDefinitionListPacket;
-use pocketmine\network\mcpe\protocol\LevelEventPacket;
-use pocketmine\network\mcpe\protocol\PlayerAuthInputPacket;
 use pocketmine\network\mcpe\protocol\ResourcePackStackPacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\Experiments;
-use pocketmine\network\mcpe\protocol\types\LevelEvent;
-use pocketmine\network\mcpe\protocol\types\PlayerAction;
-use pocketmine\network\mcpe\protocol\types\PlayerBlockActionStopBreak;
-use pocketmine\network\mcpe\protocol\types\PlayerBlockActionWithBlockInfo;
-use pocketmine\player\Player;
+use pocketmine\Player;
 use pocketmine\scheduler\ClosureTask;
 use pocketmine\scheduler\TaskHandler;
-use pocketmine\world\Position;
+use pocketmine\level\Position;
 use function floor;
 use function implode;
 
@@ -49,7 +42,8 @@ final class EventListener implements Listener{
 
 	/** @priority HIGHEST */
 	public function onDataPacketReceive(DataPacketReceiveEvent $event) : void{
-		$packet = $event->getPacket();
+		//TODO
+		/*$packet = $event->getPacket();
 		if(!$packet instanceof PlayerAuthInputPacket){
 			return;
 		}
@@ -57,7 +51,7 @@ final class EventListener implements Listener{
 		if($blockActions === null){
 			return;
 		}
-		$player = $event->getOrigin()->getPlayer();
+		$player = $event->getPlayer();
 		if($player === null){
 			return;
 		}
@@ -94,25 +88,21 @@ final class EventListener implements Listener{
 			if($handled){
 				$event->cancel();
 			}
-		}
+		}*/
 	}
 
 	public function onDataPacketSend(DataPacketSendEvent $event) : void{
-		$packets = $event->getPackets();
-		foreach($packets as $packet){
-			if($packet instanceof StartGamePacket){
-				$packet->levelSettings->experiments = new Experiments([
-					"data_driven_items" => true
-				], true);
-			}elseif($packet instanceof ResourcePackStackPacket){
-				$packet->experiments = new Experiments([
-					"data_driven_items" => true
-				], true);
-			}elseif($packet instanceof BiomeDefinitionListPacket){
-				foreach($event->getTargets() as $session){
-					$session->sendDataPacket(CustomItemManager::getInstance()->getPacket());
-				}
-			}
+		$packet = $event->getPacket();
+		if($packet instanceof StartGamePacket){
+			$packet->experiments = new Experiments([
+				"data_driven_items" => true
+			], true);
+		}elseif($packet instanceof ResourcePackStackPacket){
+			$packet->experiments = new Experiments([
+				"data_driven_items" => true
+			], true);
+		}elseif($packet instanceof BiomeDefinitionListPacket){
+			$event->getPlayer()->sendDataPacket(CustomItemManager::getInstance()->getPacket());
 		}
 	}
 
@@ -142,7 +132,7 @@ final class EventListener implements Listener{
 		 */
 		// Credit: ๖ζ͜͡Apakoh
 		$handler = CustomItemLoader::getInstance()->getScheduler()->scheduleDelayedTask(new ClosureTask(function() use ($pos, $item, $player) : void{
-			$pos->getWorld()->useBreakOn($pos, $item, $player);
+			$pos->getLevelNonNull()->useBreakOn($pos, $item, $player);
 			unset($this->handlers[$player->getName()][$this->blockHash($pos)]);
 		}), (int) floor($breakTime));
 		if(!isset($this->handlers[$player->getName()])){
@@ -161,18 +151,18 @@ final class EventListener implements Listener{
 	}
 
 	private function blockHash(Position $pos) : string{
-		return implode(":", [$pos->getFloorX(), $pos->getFloorY(), $pos->getFloorZ(), $pos->getWorld()->getFolderName()]);
+		return implode(":", [$pos->getFloorX(), $pos->getFloorY(), $pos->getFloorZ(), $pos->getLevelNonNull()->getFolderName()]);
 	}
 
 	/**
 	 * Returns the calculated break speed as percentage progress per game tick.
 	 */
 	private function calculateBreakProgressPerTick(Block $block, Player $player) : float{
-		if(!$block->getBreakInfo()->isBreakable()){
+		if($block->getHardness() < 0){
 			return 0.0;
 		}
 		//TODO: improve this to take stuff like swimming, ladders, enchanted tools into account, fix wrong tool break time calculations for bad tools (pmmp/PocketMine-MP#211)
-		$breakTimePerTick = $block->getBreakInfo()->getBreakTime($player->getInventory()->getItemInHand()) * 20;
+		$breakTimePerTick = $block->getBreakTime($player->getInventory()->getItemInHand()) * 20;
 
 		if($breakTimePerTick > 0){
 			return 1 / $breakTimePerTick;
